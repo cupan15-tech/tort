@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>С днём рождения!</title>
+<style>
+  :root{
+    --ink:#fff4ea;
+    --muted:#c0aec6;
+    --accent:#ffb648;
+    --lit:1;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",sans-serif;
+    color:var(--ink);
+    background:radial-gradient(120% 85% at 50% 6%, #43204e 0%, #2a1436 42%, #140c1f 100%);
+    overflow:hidden;
+    -webkit-tap-highlight-color:transparent;
+  }
+  /* свет в комнате гаснет вместе со свечами */
+  body::after{
+    content:'';position:fixed;inset:0;pointer-events:none;
+    background:radial-gradient(60% 45% at 50% 58%, rgba(255,160,60,.22), rgba(0,0,0,0) 70%);
+    opacity:var(--lit);transition:opacity .8s ease;
+  }
+
+  /* ---------- фон: боке ---------- */
+  .bokeh{position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+  .bokeh i{
+    position:absolute;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,205,140,.55),rgba(255,180,90,0) 70%);
+    animation:float linear infinite;
+  }
+  @keyframes float{
+    from{transform:translate3d(0,12vh,0) scale(.9);opacity:.15}
+    50% {opacity:.5}
+    to  {transform:translate3d(6vw,-14vh,0) scale(1.15);opacity:.1}
+  }
+
+  /* ---------- сцена ---------- */
+  .stage{
+    position:relative;z-index:2;min-height:100%;
+    display:flex;flex-direction:column;align-items:center;justify-content:space-between;
+    gap:8px;padding:max(18px,env(safe-area-inset-top)) 16px 22px;
+  }
+  .top{text-align:center;padding-top:6px}
+  .eyebrow{
+    margin:0 0 6px;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);
+  }
+  h1{
+    margin:0;font-size:clamp(24px,6.2vw,40px);line-height:1.15;font-weight:700;
+    text-shadow:0 0 26px rgba(255,150,50,calc(.35 * var(--lit)));
+  }
+  h1 span{
+    color:var(--accent);border-bottom:2px dashed rgba(255,182,72,.35);
+    outline:none;padding:0 2px;cursor:text;
+  }
+  h1 span:focus{border-bottom-style:solid;background:rgba(255,182,72,.08);border-radius:4px}
+
+  /* ---------- торт ---------- */
+  .cake-wrap{position:relative;display:grid;place-items:center;padding:6px 0}
+  .cake{position:relative;width:320px;padding-top:104px;transform-origin:50% 100%}
+  @media (max-height:720px){ .cake{transform:scale(.86)} }
+  @media (max-width:380px){ .cake{transform:scale(.82)} }
+
+  .candles{
+    position:absolute;top:0;left:0;right:0;height:104px;
+    display:flex;align-items:flex-end;justify-content:center;gap:14px;z-index:9;
+  }
+  .candle{
+    position:relative;width:13px;height:56px;border-radius:6px 6px 3px 3px;
+    background:repeating-linear-gradient(135deg,#fffdfa 0 6px,#ff7f9e 6px 12px);
+    box-shadow:inset -3px 0 6px rgba(0,0,0,.2), 0 2px 3px rgba(0,0,0,.25);
+  }
+  .candle::before{content:'';position:absolute;top:-3px;left:0;right:0;height:6px;border-radius:50%;background:#fffdfa}
+  .wick{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);width:2px;height:8px;background:#3b2a26;border-radius:1px}
+
+  .flame-wrap{
+    position:absolute;left:50%;bottom:calc(100% + 5px);
+    transform:translateX(-50%) rotate(var(--lean,0deg)) scale(var(--sx,1),var(--sy,1));
+    transform-origin:50% 100%;
+    transition:opacity .16s ease;
+  }
+  .flame{
+    position:relative;width:18px;height:30px;transform-origin:50% 100%;
+    background:radial-gradient(60% 55% at 50% 78%, #fffdf0 0%, #ffe792 20%, #ffb63c 46%, #ff6a12 74%, rgba(255,90,0,0) 100%);
+    border-radius:50% 50% 42% 42% / 74% 74% 30% 30%;
+    filter:drop-shadow(0 0 10px rgba(255,155,45,.8)) drop-shadow(0 0 26px rgba(255,110,0,.45));
+    animation:flick 210ms infinite alternate ease-in-out;
+  }
+  .flame::after{
+    content:'';position:absolute;left:50%;bottom:2px;width:7px;height:11px;transform:translateX(-50%);
+    background:radial-gradient(ellipse at 50% 70%, #d9ecff 0%, #8dbcff 55%, rgba(140,190,255,0) 100%);
+    border-radius:50%;opacity:.8;
+  }
+  @keyframes flick{
+    from{transform:scale(1,1) translateY(0)}
+    to  {transform:scale(1.07,.93) translateY(1px)}
+  }
+  .halo{
+    position:absolute;left:50%;bottom:calc(100% + 6px);width:96px;height:96px;
+    transform:translate(-50%,22%);border-radius:50%;pointer-events:none;
+    background:radial-gradient(circle,rgba(255,170,60,.32),rgba(255,140,0,0) 68%);
+    animation:halo 1.7s infinite alternate ease-in-out;transition:opacity .25s ease;
+  }
+  @keyframes halo{
+    from{opacity:.75;transform:translate(-50%,22%) scale(.94)}
+    to  {opacity:1;transform:translate(-50%,22%) scale(1.06)}
+  }
+  .candle.out .flame-wrap,.candle.out .halo{opacity:0}
+
+  .smoke{
+    position:absolute;left:50%;bottom:calc(100% + 4px);width:10px;height:10px;border-radius:50%;
+    background:rgba(226,224,235,.55);filter:blur(3px);pointer-events:none;
+    animation:smoke 1.7s ease-out forwards;
+  }
+  @keyframes smoke{
+    0%  {transform:translate(-50%,0) scale(.35);opacity:.75}
+    100%{transform:translate(calc(-50% + var(--dx,10px)),-78px) scale(2.8);opacity:0}
+  }
+
+  .tier{
+    position:relative;margin:0 auto;border-radius:7px 7px 16px 16px;
+    box-shadow:inset 0 -20px 30px rgba(0,0,0,.28), 0 12px 26px rgba(0,0,0,.35);
+  }
+  .t1{width:172px;height:70px;background:linear-gradient(#ec7ba0,#c8426d);z-index:7}
+  .t2{width:242px;height:82px;background:linear-gradient(#f0a469,#d0663a);z-index:5;margin-top:-3px}
+  .t3{width:308px;height:94px;background:linear-gradient(#a86edb,#743cae);z-index:3;margin-top:-3px}
+
+  .frost{
+    position:absolute;left:-5px;right:-5px;top:-16px;height:32px;
+    border-radius:50% 50% 10px 10px / 62% 62% 12px 12px;
+    background:linear-gradient(#fffaf3,#ffe4cc);color:#ffe4cc;
+    box-shadow:0 7px 12px rgba(0,0,0,.16);
+  }
+  /* капли глазури */
+  .frost::after{
+    content:'';position:absolute;left:0;right:0;top:calc(100% - 7px);height:24px;
+    background:radial-gradient(circle at 11px 0, currentColor 10.5px, rgba(0,0,0,0) 11px) repeat-x;
+    background-size:22px 22px;
+  }
+  .sprinkles{position:absolute;inset:14px 6px 8px;overflow:hidden;border-radius:0 0 14px 14px}
+  .sprinkles i{position:absolute;width:9px;height:3.5px;border-radius:2px;opacity:.9}
+
+  .plate{
+    position:relative;width:352px;height:18px;margin:-4px auto 0;z-index:2;
+    border-radius:6px 6px 50% 50% / 6px 6px 100% 100%;
+    background:linear-gradient(#efe7f7,#b6a9cd);
+    box-shadow:0 16px 30px rgba(0,0,0,.5);
+  }
+  .plate::after{
+    content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+    width:74px;height:9px;border-radius:0 0 40% 40%;background:linear-gradient(#b6a9cd,#8d80a8);
+  }
+
+  /* ---------- пульт ---------- */
+  .panel{width:100%;max-width:430px;text-align:center;display:grid;gap:12px;justify-items:center}
+  .status{margin:0;min-height:2.6em;font-size:15px;line-height:1.35;color:var(--muted)}
+  .status b{color:var(--ink);font-weight:600}
+  .btn{
+    appearance:none;border:0;cursor:pointer;font:inherit;font-weight:600;font-size:16px;
+    padding:13px 24px;border-radius:999px;color:#2a1122;
+    background:linear-gradient(#ffd08a,#ffab3d);
+    box-shadow:0 8px 20px rgba(255,150,40,.3), inset 0 1px 0 rgba(255,255,255,.6);
+    transition:transform .12s ease, box-shadow .2s ease;touch-action:manipulation;
+  }
+  .btn:active{transform:translateY(2px) scale(.99)}
+  .btn[disabled]{opacity:.6;cursor:default}
+  .btn.ghost{
+    background:rgba(255,255,255,.07);color:var(--ink);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);font-size:14px;padding:10px 18px;font-weight:500;
+  }
+  .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .meter{
+    position:relative;width:min(300px,80vw);height:12px;border-radius:999px;
+    background:rgba(255,255,255,.09);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);overflow:hidden;
+    opacity:0;transition:opacity .3s ease;
+  }
+  .meter.on{opacity:1}
+  .meter i{
+    position:absolute;inset:0 auto 0 0;width:0%;border-radius:999px;
+    background:linear-gradient(90deg,#6ee7d0,#ffd166 55%,#ff5f6d);
+    transition:width .06s linear;
+  }
+  .meter u{position:absolute;top:-3px;bottom:-3px;left:32%;width:2px;background:rgba(255,255,255,.5);border-radius:2px}
+  .hint{margin:0;font-size:12.5px;color:rgba(192,174,198,.75)}
+  .hint code,.status code{font-family:ui-monospace,Consolas,monospace;background:rgba(255,255,255,.08);padding:1px 5px;border-radius:5px}
+
+  /* диагностика: index.html?debug=1 */
+  #dbg{
+    position:fixed;top:10px;left:10px;z-index:70;margin:0;padding:10px 12px;
+    font:12px/1.5 ui-monospace,Consolas,monospace;white-space:pre;
+    color:#d8ffe8;background:rgba(10,6,16,.72);border-radius:10px;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);pointer-events:none;
+  }
+
+  .wish{
+    position:fixed;inset:0;z-index:60;display:grid;place-items:center;pointer-events:none;
+    opacity:0;transition:opacity .7s ease;
+  }
+  .wish div{
+    text-align:center;padding:26px 30px;border-radius:24px;max-width:min(420px,86vw);
+    background:rgba(30,14,40,.55);backdrop-filter:blur(8px);
+    box-shadow:0 20px 60px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.12);
+    transform:translateY(14px) scale(.96);transition:transform .7s cubic-bezier(.2,.9,.2,1);
+  }
+  .wish h2{margin:0 0 6px;font-size:clamp(22px,5.4vw,32px)}
+  .wish p{margin:0;color:var(--muted);font-size:14px}
+  body.done .wish{opacity:1}
+  body.done .wish div{transform:none}
+  #confetti{position:fixed;inset:0;z-index:55;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="bokeh" id="bokeh"></div>
+<canvas id="confetti"></canvas>
+<pre id="dbg" hidden></pre>
+
+<div class="stage">
+  <header class="top">
+    <p class="eyebrow">Загадывай желание</p>
+    <h1>С днём рождения,<br><span id="who" contenteditable="true" spellcheck="false">друг</span>!</h1>
+  </header>
+
+  <div class="cake-wrap">
+    <div class="cake">
+      <div class="candles" id="candles"></div>
+      <div class="tier t1"><div class="frost"></div><div class="sprinkles"></div></div>
+      <div class="tier t2"><div class="frost"></div><div class="sprinkles"></div></div>
+      <div class="tier t3"><div class="frost"></div><div class="sprinkles"></div></div>
+      <div class="plate"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <p class="status" id="status">Нажми кнопку и разреши доступ к микрофону — а потом дуй на свечи как следует.</p>
+    <div class="meter" id="meter"><i id="fill"></i><u></u></div>
+    <div class="row">
+      <button class="btn" id="mic">🎤 Включить микрофон</button>
+      <button class="btn ghost" id="manual">Дунуть вручную (пробел)</button>
+      <button class="btn ghost" id="relight" hidden>Зажечь снова</button>
+    </div>
+    <p class="hint">Имя можно исправить прямо в тексте, а ещё передать ссылкой: <code>?name=Аня&amp;candles=7</code></p>
+  </div>
+</div>
+
+<div class="wish"><div>
+  <h2 id="wishTitle">Желание загадано! 🎉</h2>
+  <p>Пусть всё сбудется. И пусть тортик будет вкусным.</p>
+</div></div>
+
+<script>
+(function(){
+  'use strict';
+  var qs = new URLSearchParams(location.search);
+  function $(id){ return document.getElementById(id); }
+  function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
+
+  /* ---------- имя и число свечей ---------- */
+  var who = $('who');
+  if (qs.get('name')) who.textContent = qs.get('name').slice(0,24);
+  who.addEventListener('keydown', function(e){
+    if (e.key === 'Enter'){ e.preventDefault(); who.blur(); }
+  });
+  who.addEventListener('paste', function(e){
+    e.preventDefault();
+    var t = (e.clipboardData || window.clipboardData).getData('text') || '';
+    document.execCommand('insertText', false, t.slice(0,24));
+  });
+
+  var COUNT = clamp(parseInt(qs.get('candles'), 10) || 5, 1, 12);
+
+  /* ---------- фон ---------- */
+  (function bokeh(){
+    var html = '';
+    for (var i=0;i<18;i++){
+      var s = 40 + Math.random()*130;
+      html += '<i style="width:'+s.toFixed(0)+'px;height:'+s.toFixed(0)+'px;left:'+
+              (Math.random()*100).toFixed(1)+'%;top:'+(Math.random()*100).toFixed(1)+
+              '%;animation-duration:'+(14+Math.random()*18).toFixed(1)+
+              's;animation-delay:-'+(Math.random()*20).toFixed(1)+'s"></i>';
+    }
+    $('bokeh').innerHTML = html;
+  })();
+
+  /* ---------- посыпка ---------- */
+  (function sprinkles(){
+    var colors = ['#fff8ef','#7ee0c8','#ffd166','#8fc0ff','#ff8fb0','#c9a2ff'];
+    var boxes = document.querySelectorAll('.sprinkles');
+    for (var b=0;b<boxes.length;b++){
+      var n = 12 + b*5, html = '';
+      for (var i=0;i<n;i++){
+        html += '<i style="left:'+(Math.random()*94).toFixed(1)+'%;top:'+(Math.random()*88).toFixed(1)+
+                '%;background:'+colors[(Math.random()*colors.length)|0]+
+                ';transform:rotate('+((Math.random()*180)|0)+'deg)"></i>';
+      }
+      boxes[b].innerHTML = html;
+    }
+  })();
+
+  /* ---------- свечи ---------- */
+  var candles = [];
+  (function build(){
+    var frag = document.createDocumentFragment();
+    for (var i=0;i<COUNT;i++){
+      var c = document.createElement('div');
+      c.className = 'candle';
+      c.style.height = (52 + Math.round(Math.random()*7)) + 'px';
+      c.innerHTML = '<div class="halo"></div><div class="wick"></div>' +
+                    '<div class="flame-wrap"><div class="flame" style="animation-delay:-' +
+                    (Math.random()*0.2).toFixed(2) + 's"></div></div>';
+      frag.appendChild(c);
+      candles.push({ el:c, wrap:c.querySelector('.flame-wrap'), out:false });
+    }
+    $('candles').appendChild(frag);
+  })();
+
+  /* порог задувания для каждой свечи: гаснут по очереди */
+  var gates = candles.map(function(_, i){ return 0.30 + (i+1) * (0.70/COUNT); });
+
+  /* ---------- звук ---------- */
+  var ac = null, analyser = null, td = null, fd = null, micStream = null;
+  var noiseFloor = 0, calibSum = 0, calibFrames = 0, calibrated = false;
+  var threshold = 0.05, smoothed = 0;
+
+  /* ---------- диагностика (?debug=1) ---------- */
+  var dbgOn = qs.get('debug') === '1';
+  var dbgBox = $('dbg'), dbgAt = 0;
+  var dbg = { rms:0, low:0, lvl:0, dev:'—', err:'—' };
+  if (dbgOn) dbgBox.hidden = false;
+
+  function drawDbg(now){
+    if (!dbgOn || now - dbgAt < 100) return;
+    dbgAt = now;
+    dbgBox.textContent =
+      'protocol   ' + location.protocol + '\n' +
+      'secure ctx ' + (window.isSecureContext ? 'да' : 'НЕТ — микрофон запрещён') + '\n' +
+      'mediaDev.  ' + (navigator.mediaDevices ? 'есть' : 'НЕТ') + '\n' +
+      'микрофон   ' + dbg.dev + '\n' +
+      'ошибка     ' + dbg.err + '\n' +
+      'sampleRate ' + (ac ? ac.sampleRate : '—') + '\n' +
+      'порог      ' + threshold.toFixed(4) + (calibrated ? '' : ' (калибровка…)') + '\n' +
+      'фон (rms)  ' + noiseFloor.toFixed(4) + '\n' +
+      'rms        ' + dbg.rms.toFixed(4) + '\n' +
+      'низкие     ' + (dbg.low*100).toFixed(0) + '%  (нужно >45%)\n' +
+      'уровень    ' + dbg.lvl.toFixed(2) + '  (нужно >0.32)\n' +
+      'сила       ' + power.toFixed(2) + ' / ' + gates[gates.length-1].toFixed(2);
+  }
+
+  function tone(freq, at, dur, peak){
+    var o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'triangle';
+    o.frequency.value = freq;
+    o.connect(g); g.connect(ac.destination);
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(peak, at + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.start(at); o.stop(at + dur + 0.05);
+  }
+
+  /* короткий шумовой «пуф» в момент задувания */
+  function puff(){
+    if (!ac) return;
+    var len = Math.floor(ac.sampleRate * 0.25);
+    var buf = ac.createBuffer(1, len, ac.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i=0;i<len;i++){ d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 2.2); }
+    var src = ac.createBufferSource(); src.buffer = buf;
+    var lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900;
+    var g = ac.createGain(); g.gain.value = 0.3;
+    src.connect(lp); lp.connect(g); g.connect(ac.destination);
+    src.start();
+  }
+
+  /* «Happy Birthday», первая фраза */
+  function melody(){
+    if (!ac) return;
+    var seq = [[392,0.75],[392,0.25],[440,1],[392,1],[523.25,1],[493.88,2]];
+    var q = 0.30, t = ac.currentTime + 0.3;
+    for (var i=0;i<seq.length;i++){
+      tone(seq[i][0], t, seq[i][1]*q*0.95, 0.16);
+      t += seq[i][1]*q;
+    }
+  }
+
+  /* ---------- измерение дутья ---------- */
+  function measure(){
+    analyser.getFloatTimeDomainData(td);
+    var sum = 0, i;
+    for (i=0;i<td.length;i++){ sum += td[i]*td[i]; }
+    var rms = Math.sqrt(sum/td.length);
+    dbg.rms = rms;
+
+    /* первые ~0.7 с слушаем фон, чтобы подстроить порог под комнату и микрофон */
+    if (!calibrated){
+      calibSum += rms; calibFrames++;
+      if (calibFrames >= 42){
+        noiseFloor = calibSum/calibFrames;
+        threshold = clamp(noiseFloor*2.4 + 0.014, 0.03, 0.14);
+        calibrated = true;
+        say('Набери воздуха и <b>дуй прямо в микрофон</b> — сильно и не отпуская!');
+      }
+      return 0;
+    }
+
+    /* дутьё — широкий низкочастотный шум; речь и музыка живут выше */
+    analyser.getByteFrequencyData(fd);
+    var binHz = ac.sampleRate / analyser.fftSize, low = 0, tot = 0;
+    for (i=1;i<fd.length;i++){
+      var hz = i*binHz;
+      if (hz > 6000) break;
+      tot += fd[i];
+      if (hz < 520) low += fd[i];
+    }
+    var lowRatio = tot > 0 ? low/tot : 0;
+
+    var lvl = clamp((rms - threshold) / 0.30, 0, 1);
+    if (lowRatio < 0.45) lvl *= 0.22;                 /* крик и музыка почти не считаются */
+    else if (lowRatio > 0.62) lvl = Math.min(1, lvl*1.15);
+
+    dbg.low = lowRatio;
+    dbg.lvl = lvl;
+    return lvl;
+  }
+
+  function wind(s){
+    for (var i=0;i<candles.length;i++){
+      var c = candles[i];
+      if (c.out) continue;
+      var jitter = 0.75 + 0.5*Math.sin(performance.now()/90 + i);
+      c.wrap.style.setProperty('--lean', (s*42*jitter).toFixed(1) + 'deg');
+      c.wrap.style.setProperty('--sy', (1 - s*0.45).toFixed(3));
+      c.wrap.style.setProperty('--sx', (1 + s*0.30).toFixed(3));
+    }
+  }
+
+  function plural(n,a,b,c){
+    var n10 = n%10, n100 = n%100;
+    if (n10 === 1 && n100 !== 11) return a;
+    if (n10 >= 2 && n10 <= 4 && (n100 < 10 || n100 >= 20)) return b;
+    return c;
+  }
+
+  function say(html){ $('status').innerHTML = html; }
+
+  function blowOut(c){
+    c.out = true;
+    c.el.classList.add('out');
+    for (var k=0;k<4;k++){
+      var s = document.createElement('div');
+      s.className = 'smoke';
+      s.style.setProperty('--dx', ((Math.random()*30)-6).toFixed(0) + 'px');
+      s.style.animationDelay = (k*0.16).toFixed(2) + 's';
+      c.el.appendChild(s);
+      window.setTimeout(function(el){ return function(){ el.remove(); }; }(s), 2300 + k*160);
+    }
+    puff();
+
+    var lit = 0;
+    for (var i=0;i<candles.length;i++){ if (!candles[i].out) lit++; }
+    document.documentElement.style.setProperty('--lit', (lit/COUNT).toFixed(2));
+
+    if (lit === 0) finish();
+    else say('Осталось <b>' + lit + '</b> ' + plural(lit,'свеча','свечи','свечей') + ' — не выдыхай!');
+  }
+
+  var power = 0, done = false, manualHeld = false, manualLevel = 0;
+
+  function finish(){
+    if (done) return;
+    done = true;
+    var name = who.textContent.trim();
+    $('wishTitle').textContent = (name ? name + ', желание' : 'Желание') + ' загадано! 🎉';
+    burstConfetti();
+    melody();
+    say('<b>Все свечи потухли!</b> Загаданное обязательно сбудется.');
+    /* сначала дым и конфетти, карточка с пожеланием — через секунду */
+    window.setTimeout(function(){
+      if (!done) return;
+      document.body.classList.add('done');
+      $('relight').hidden = false;
+    }, 1200);
+  }
+
+  function relight(){
+    done = false;
+    power = 0;
+    document.body.classList.remove('done');
+    document.documentElement.style.setProperty('--lit', '1');
+    confettiPieces.length = 0;
+    for (var i=0;i<candles.length;i++){
+      candles[i].out = false;
+      candles[i].el.classList.remove('out');
+    }
+    $('relight').hidden = true;
+    say(analyser ? 'Свечи горят снова. Дуй!' : 'Свечи горят снова.');
+  }
+
+  /* ---------- главный цикл ---------- */
+  var last = performance.now();
+  function tick(now){
+    var dt = Math.min(0.05, (now - last)/1000);
+    last = now;
+
+    var lvl = analyser ? measure() : 0;
+    manualLevel = manualHeld ? Math.min(0.9, manualLevel + dt*1.8)
+                             : Math.max(0, manualLevel - dt*3);
+    var s = Math.max(lvl, manualLevel);
+    smoothed = smoothed*0.55 + s*0.45;
+
+    $('fill').style.width = (smoothed*100).toFixed(0) + '%';
+
+    if (!done){
+      wind(smoothed);
+      /* слабое дыхание не накапливается — нужно дуть по-настоящему */
+      if (smoothed > 0.32) power += (smoothed - 0.28) * dt * 2.2;
+      else                 power -= dt * 0.5;
+      power = clamp(power, 0, 1.05);
+
+      for (var i=0;i<candles.length;i++){
+        if (!candles[i].out && power >= gates[i]) blowOut(candles[i]);
+      }
+      if (calibrated && power < 0.1 && smoothed > 0.12 && smoothed < 0.32){
+        say('Слышу, но слабовато — <b>дуй сильнее</b> и ближе к микрофону.');
+      }
+    } else {
+      wind(0);
+    }
+
+    drawConfetti(dt);
+    drawDbg(now);
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  /* ---------- микрофон ---------- */
+  function micError(err){
+    var name = (err && err.name) || 'UnknownError';
+    dbg.err = name + (err && err.message ? ' — ' + err.message : '');
+    var text = {
+      NotAllowedError:  'Доступ к микрофону запрещён. Нажми на иконку микрофона (или замок) слева в адресной строке и разреши его для этой страницы, потом перезагрузи.',
+      PermissionDeniedError: 'Доступ к микрофону запрещён. Разреши его в адресной строке и перезагрузи страницу.',
+      NotFoundError:    'Микрофон не найден. Проверь, что он подключён и включён в настройках Windows: Параметры → Система → Звук → Ввод.',
+      DevicesNotFoundError: 'Микрофон не найден — проверь подключение и настройки звука Windows.',
+      NotReadableError: 'Микрофон занят другой программой (Zoom, Teams, Discord, OBS). Закрой её и попробуй снова.',
+      TrackStartError:  'Микрофон занят другой программой. Закрой её и попробуй снова.',
+      SecurityError:    'Браузер заблокировал микрофон из-за небезопасного контекста — нужен <code>https://</code> или <code>http://localhost</code>.'
+    }[name] || ('Микрофон не включился: <code>' + name + '</code>.');
+    say(text + '<br>Свечи всегда можно задуть кнопкой «Дунуть вручную».');
+  }
+
+  $('mic').addEventListener('click', function(){
+    var btn = this;
+    /* главная причина «не работает»: страница открыта как файл, а не по https/localhost */
+    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      dbg.err = 'нет secure context (' + location.protocol + ')';
+      say('Страница открыта как <code>' + location.protocol + '</code>, а микрофон браузеры дают только на ' +
+          '<code>https://</code> или <code>http://localhost</code>.<br>' +
+          'Открой её по локальному адресу или выложи в интернет — тогда задувание заработает. ' +
+          'А сейчас свечи можно задуть кнопкой «Дунуть вручную».');
+      return;
+    }
+    btn.disabled = true;
+    say('Разреши доступ к микрофону в подсказке браузера…');
+    navigator.mediaDevices.getUserMedia({
+      audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false }
+    }).then(function(stream){
+      micStream = stream;
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      if (ac.state === 'suspended') ac.resume();
+      analyser = ac.createAnalyser();
+      analyser.fftSize = 1024;
+      analyser.smoothingTimeConstant = 0.45;
+      ac.createMediaStreamSource(stream).connect(analyser);
+      td = new Float32Array(analyser.fftSize);
+      fd = new Uint8Array(analyser.frequencyBinCount);
+      var track = stream.getAudioTracks()[0];
+      dbg.dev = (track && track.label) || 'без названия';
+      dbg.err = 'нет';
+      $('meter').classList.add('on');
+      btn.textContent = '🎤 Микрофон включён';
+      say('Слушаю тишину, чтобы подстроиться… секунду.');
+    })['catch'](function(err){
+      btn.disabled = false;
+      micError(err);
+    });
+  });
+
+  /* ---------- запасной вариант без микрофона ---------- */
+  function hold(on){ return function(e){ e.preventDefault(); manualHeld = on; }; }
+  $('manual').addEventListener('pointerdown', hold(true));
+  $('manual').addEventListener('pointercancel', hold(false));
+  window.addEventListener('pointerup', hold(false));
+  window.addEventListener('keydown', function(e){
+    if (e.code === 'Space' && document.activeElement !== who){ e.preventDefault(); manualHeld = true; }
+  });
+  window.addEventListener('keyup', function(e){
+    if (e.code === 'Space') manualHeld = false;
+  });
+  $('relight').addEventListener('click', relight);
+
+  /* ---------- конфетти ---------- */
+  var cv = $('confetti'), cx = cv.getContext('2d'), confettiPieces = [];
+  function resize(){
+    var r = window.devicePixelRatio || 1;
+    cv.width = window.innerWidth*r;
+    cv.height = window.innerHeight*r;
+    cx.setTransform(r,0,0,r,0,0);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function burstConfetti(){
+    var colors = ['#ffd166','#ff8fb0','#7ee0c8','#8fc0ff','#c9a2ff','#fff8ef'];
+    for (var i=0;i<160;i++){
+      confettiPieces.push({
+        x: window.innerWidth*(0.15 + Math.random()*0.7),
+        y: window.innerHeight*0.55 - Math.random()*40,
+        vx: (Math.random()-0.5)*420,
+        vy: -260 - Math.random()*420,
+        w: 5 + Math.random()*7,
+        h: 8 + Math.random()*10,
+        rot: Math.random()*Math.PI,
+        vr: (Math.random()-0.5)*10,
+        c: colors[(Math.random()*colors.length)|0],
+        life: 3.2 + Math.random()*1.8
+      });
+    }
+  }
+
+  function drawConfetti(dt){
+    cx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    for (var i=confettiPieces.length-1;i>=0;i--){
+      var p = confettiPieces[i];
+      p.vy += 780*dt;
+      p.vx *= 0.995;
+      p.x += p.vx*dt;
+      p.y += p.vy*dt;
+      p.rot += p.vr*dt;
+      p.life -= dt;
+      if (p.life <= 0 || p.y > window.innerHeight + 60){ confettiPieces.splice(i,1); continue; }
+      cx.save();
+      cx.translate(p.x, p.y);
+      cx.rotate(p.rot);
+      cx.globalAlpha = clamp(p.life, 0, 1);
+      cx.fillStyle = p.c;
+      cx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+      cx.restore();
+    }
+  }
+
+  window.addEventListener('pagehide', function(){
+    if (micStream) micStream.getTracks().forEach(function(t){ t.stop(); });
+  });
+})();
+</script>
+</body>
+</html>

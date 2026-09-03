@@ -337,6 +337,24 @@
   var noiseFloor = 0, calibSum = 0, calibFrames = 0, calibrated = false;
   var threshold = 0.05, smoothed = 0;
 
+  /* ---------- пороги: всё, что стоит крутить, собрано здесь ---------- */
+  var TUNE = {
+    rawScale:   0.20,   /* громкость, на которой полоска полна */
+    levelSpan:  0.16,   /* насколько выше порога должен быть выдох для максимума */
+    floorMul:   1.7,    /* во сколько раз порог выше фонового шума */
+    floorAdd:   0.006,
+    floorMin:   0.018,
+    floorMax:   0.090,
+    lowGate:    0.38,   /* доля низких частот: ниже — это не выдох */
+    lowPenalty: 0.35,
+    blowMin:    0.22,   /* с какого уровня копится сила */
+    blowRate:   2.4
+  };
+
+  /* чувствительность: ?gain=2 вручную, плюс автоподъём для тихих микрофонов */
+  var gain = parseFloat(qs.get('gain')) || 1;
+  var peakSeen = 0, sinceCalib = 0;
+
   /* ---------- диагностика (?debug=1) ---------- */
   var dbgOn = qs.get('debug') === '1';
   var dbgBox = $('dbg'), dbgAt = 0;
@@ -353,11 +371,12 @@
       'микрофон   ' + dbg.dev + '\n' +
       'ошибка     ' + dbg.err + '\n' +
       'sampleRate ' + (ac ? ac.sampleRate : '—') + '\n' +
+      'чувств.    x' + gain + '\n' +
       'порог      ' + threshold.toFixed(4) + (calibrated ? '' : ' (калибровка…)') + '\n' +
       'фон (rms)  ' + noiseFloor.toFixed(4) + '\n' +
       'rms        ' + dbg.rms.toFixed(4) + '\n' +
-      'низкие     ' + (dbg.low*100).toFixed(0) + '%  (нужно >45%)\n' +
-      'уровень    ' + dbg.lvl.toFixed(2) + '  (нужно >0.32)\n' +
+      'низкие     ' + (dbg.low*100).toFixed(0) + '%  (нужно >' + (TUNE.lowGate*100).toFixed(0) + '%)\n' +
+      'уровень    ' + dbg.lvl.toFixed(2) + '  (нужно >' + TUNE.blowMin + ')\n' +
       'сила       ' + power.toFixed(2) + ' / ' + gates[gates.length-1].toFixed(2);
   }
 
@@ -402,17 +421,19 @@
     analyser.getFloatTimeDomainData(td);
     var sum = 0, i;
     for (i=0;i<td.length;i++){ sum += td[i]*td[i]; }
-    var rms = Math.sqrt(sum/td.length);
+    var rms = Math.sqrt(sum/td.length) * gain;
     dbg.rms = rms;
-    rawLevel = clamp(rms/0.35, 0, 1);   /* сырая громкость — для полоски */
+    rawLevel = clamp(rms/TUNE.rawScale, 0, 1);   /* сырая громкость — для полоски */
 
     /* первые ~0.7 с слушаем фон, чтобы подстроить порог под комнату и микрофон */
     if (!calibrated){
       calibSum += rms; calibFrames++;
       if (calibFrames >= 42){
         noiseFloor = calibSum/calibFrames;
-        threshold = clamp(noiseFloor*2.4 + 0.014, 0.03, 0.14);
+        threshold = clamp(noiseFloor*TUNE.floorMul + TUNE.floorAdd, TUNE.floorMin, TUNE.floorMax);
         calibrated = true;
+        sinceCalib = 0; peakSeen = 0;
+        placeMark();
         say('Набери воздуха и <b>дуй прямо в микрофон</b> — сильно и не отпуская!');
       }
       return 0;
@@ -429,9 +450,9 @@
     }
     var lowRatio = tot > 0 ? low/tot : 0;
 
-    var lvl = clamp((rms - threshold) / 0.30, 0, 1);
-    if (lowRatio < 0.45) lvl *= 0.22;                 /* крик и музыка почти не считаются */
-    else if (lowRatio > 0.62) lvl = Math.min(1, lvl*1.15);
+    var lvl = clamp((rms - threshold) / TUNE.levelSpan, 0, 1);
+    if (lowRatio < TUNE.lowGate) lvl *= TUNE.lowPenalty;   /* крик и музыка считаются слабо */
+    else if (lowRatio > 0.60) lvl = Math.min(1, lvl*1.2);
 
     dbg.low = lowRatio;
     dbg.lvl = lvl;
@@ -519,6 +540,12 @@
     return c;
   }
 
+  /* метка на полоске — та громкость, с которой выдох начинает считаться */
+  function placeMark(){
+    var mark = clamp((threshold + TUNE.blowMin*TUNE.levelSpan) / TUNE.rawScale, 0.05, 0.95);
+    document.querySelector('.meter u').style.left = (mark*100).toFixed(0) + '%';
+  }
+
   var lastMsg = '';
   function say(html){
     if (html === lastMsg) return;
@@ -594,7 +621,19 @@
     /* полоска показывает всё, что слышно, иначе «мёртвая полоска» ни о чём не говорит */
     rawSmooth = rawSmooth*0.6 + Math.max(analyser ? rawLevel : 0, manualLevel)*0.4;
     $('fill').style.width = (rawSmooth*100).toFixed(0) + '%';
-    $('meter').classList.toggle('blow', smoothed > 0.32);
+    $('meter').classList.toggle('blow', smoothed > TUNE.blowMin);
+
+    /* тихий микрофон: если за 5 с ничего громкого так и не услышали — поднимаем чувствительность */
+    if (analyser && calibrated && gain < 8){
+      sinceCalib += dt;
+      peakSeen = Math.max(peakSeen, dbg.rms);
+      if (sinceCalib > 5 && peakSeen < 0.05){
+        gain *= 2;
+        calibrated = false; calibFrames = 0; calibSum = 0;
+        sinceCalib = 0; peakSeen = 0;
+        say('Микрофон тихий — поднял чувствительность (x' + gain + '). Секунду, перекалибруюсь…');
+      }
+    }
 
     /* микрофон отдан, но в него идёт тишина — почти всегда выбран не тот вход */
     if (analyser && calibrated && !done){
@@ -610,8 +649,8 @@
     if (!done){
       wind(smoothed);
       /* слабое дыхание не накапливается — нужно дуть по-настоящему */
-      if (smoothed > 0.32) power += (smoothed - 0.28) * dt * 2.2;
-      else                 power -= dt * 0.5;
+      if (smoothed > TUNE.blowMin) power += (smoothed - TUNE.blowMin*0.85) * dt * TUNE.blowRate;
+      else                         power -= dt * 0.5;
       power = clamp(power, 0, 1.05);
 
       for (var i=0;i<candles.length;i++){
@@ -620,7 +659,7 @@
       if (calibrated && power < 0.1){
         if (rawSmooth > 0.28 && smoothed < 0.2){
           say('Звук слышу, но на выдох не похоже — <b>дуй прямо в микрофон</b>, а не говори в него.');
-        } else if (smoothed > 0.12 && smoothed < 0.32){
+        } else if (smoothed > 0.10 && smoothed < TUNE.blowMin){
           say('Слышу, но слабовато — <b>дуй сильнее</b> и ближе к микрофону.');
         }
       }

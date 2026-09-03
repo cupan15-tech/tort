@@ -587,6 +587,24 @@
 
   /* звук не выпрашиваем: если автозвук не дали — играем без него
      и молча включаем на первом же касании страницы */
+  /* прозрачная ловушка поверх плеера: любой клик включает звук, ничего не спрашивая
+     (клики внутрь чужого iframe до окна не долетают, поэтому нужен свой слой) */
+  function catchFirstClick(fn){
+    var pad = document.createElement('div');
+    pad.className = 'rickPad';
+    pad.style.cssText = 'position:absolute;inset:0;z-index:4;background:transparent';
+    rickBox.appendChild(pad);
+    function go(){
+      if (pad.parentNode) pad.remove();
+      window.removeEventListener('pointerdown', go, true);
+      window.removeEventListener('keydown', go, true);
+      try { fn(); } catch(e){}
+    }
+    pad.addEventListener('click', go);
+    window.addEventListener('pointerdown', go, true);
+    window.addEventListener('keydown', go, true);
+  }
+
   function armUnmute(fn){
     function go(){
       window.removeEventListener('pointerdown', go, true);
@@ -667,18 +685,28 @@
           }
         }
       });
-      /* автозвук могли не дать — тогда просим один клик */
-      window.setTimeout(function(){
+      /* добиваемся звука: пока плеер не играет громко — снимаем mute и жмём play.
+         Состояние 3 (буферизация) не считаем отказом, иначе глушим то, что вот-вот заиграет. */
+      var tries = 0;
+      var iv = window.setInterval(function(){
+        tries++;
         try {
-          if (rickPlayer.getPlayerState() !== 1 || rickPlayer.isMuted() || rickPlayer.getVolume() === 0){
-            rickPlayer.mute();
-            rickPlayer.playVideo();
-            armUnmute(function(){
+          var st = rickPlayer.getPlayerState();          /* 1 — играет, 3 — буферизует */
+          if (rickPlayer.isMuted() || rickPlayer.getVolume() === 0){
+            rickPlayer.unMute();
+            rickPlayer.setVolume(100);
+          }
+          if (st !== 1 && st !== 3) rickPlayer.playVideo();
+          if (st === 1 && !rickPlayer.isMuted()){ window.clearInterval(iv); return; }
+          if (tries >= 12){                              /* ~5 с уговоров — пусть идёт без звука */
+            window.clearInterval(iv);
+            if (rickPlayer.getPlayerState() !== 1){ rickPlayer.mute(); rickPlayer.playVideo(); }
+            catchFirstClick(function(){
               rickPlayer.unMute(); rickPlayer.setVolume(100); rickPlayer.playVideo();
             });
           }
-        } catch(e){}
-      }, 2200);
+        } catch(e){ window.clearInterval(iv); }
+      }, 400);
     }
 
     if (window.YT && window.YT.Player){ boot(); return; }
@@ -700,6 +728,7 @@
       rickPlayer = null;
       var f = rickBox.querySelector('iframe'); if (f) f.remove();
       var h = rickBox.querySelector('#ytHolder'); if (h) h.remove();
+      var pad = rickBox.querySelector('.rickPad'); if (pad) pad.remove();
       rickLive = false;
     }, 450);
   }

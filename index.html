@@ -222,6 +222,25 @@
   body.done .wish{opacity:1}
   body.done .wish div{transform:none}
   #confetti{position:fixed;inset:0;z-index:55;pointer-events:none}
+
+  /* ---------- рикролл ---------- */
+  #rick{
+    position:fixed;inset:0;z-index:90;background:#000;
+    display:grid;place-items:center;opacity:0;transition:opacity .45s ease;
+  }
+  #rick.show{opacity:1}
+  #rick video,#rick iframe{width:100%;height:100%;border:0;display:block;object-fit:contain;background:#000}
+  #rickClose{
+    position:absolute;top:14px;right:14px;z-index:2;width:42px;height:42px;border:0;border-radius:50%;
+    font-size:20px;line-height:1;color:#fff;background:rgba(0,0,0,.55);cursor:pointer;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);
+  }
+  #rickPlay{
+    position:absolute;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);
+    padding:18px 28px;border:0;border-radius:999px;cursor:pointer;
+    font:inherit;font-size:18px;font-weight:700;color:#2a1122;
+    background:linear-gradient(#ffd08a,#ffab3d);box-shadow:0 10px 30px rgba(0,0,0,.5);
+  }
 </style>
 </head>
 <body>
@@ -256,6 +275,11 @@
     </div>
     <p class="hint" id="hint" hidden>Полоска показывает, что слышит микрофон. Она станет оранжевой, когда узнает именно выдох.</p>
   </div>
+</div>
+
+<div id="rick" hidden>
+  <button id="rickClose" title="Закрыть" aria-label="Закрыть">✕</button>
+  <button id="rickPlay" hidden>▶ Включить звук</button>
 </div>
 
 <div class="wish"><div>
@@ -330,7 +354,7 @@
   })();
 
   /* порог задувания для каждой свечи: гаснут по очереди */
-  var gates = candles.map(function(_, i){ return 0.30 + (i+1) * (0.70/COUNT); });
+  var gates = candles.map(function(_, i){ return 0.16 + (i+1) * (0.42/COUNT); });
 
   /* ---------- звук ---------- */
   var ac = null, analyser = null, td = null, fd = null, micStream = null;
@@ -339,16 +363,16 @@
 
   /* ---------- пороги: всё, что стоит крутить, собрано здесь ---------- */
   var TUNE = {
-    rawScale:   0.20,   /* громкость, на которой полоска полна */
-    levelSpan:  0.16,   /* насколько выше порога должен быть выдох для максимума */
-    floorMul:   1.7,    /* во сколько раз порог выше фонового шума */
-    floorAdd:   0.006,
-    floorMin:   0.018,
-    floorMax:   0.090,
-    lowGate:    0.38,   /* доля низких частот: ниже — это не выдох */
-    lowPenalty: 0.35,
-    blowMin:    0.22,   /* с какого уровня копится сила */
-    blowRate:   2.4
+    rawScale:   0.18,   /* громкость, на которой полоска полна */
+    levelSpan:  0.11,   /* насколько выше порога должен быть выдох для максимума */
+    floorMul:   1.5,    /* во сколько раз порог выше фонового шума */
+    floorAdd:   0.005,
+    floorMin:   0.013,
+    floorMax:   0.070,
+    lowGate:    0.34,   /* доля низких частот: ниже — это не выдох */
+    lowPenalty: 0.45,
+    blowMin:    0.16,   /* с какого уровня копится сила */
+    blowRate:   1.3    /* сильный выдох — ~0.6 с, обычный — ~1.2 с */
   };
 
   /* чувствительность: ?gain=2 вручную, плюс автоподъём для тихих микрофонов */
@@ -576,13 +600,130 @@
 
   var power = 0, done = false, manualHeld = false, manualLevel = 0;
 
+  /* ---------- рикролл: запускается сразу, как погасла последняя свеча ---------- */
+  /* по умолчанию — короткая заливка без рекламы, крутится по кругу.
+     ?rick=dQw4w9WgXcQ — официальный клип целиком, ?rick=0 — выключить рикролл */
+  var rickArg = qs.get('rick');
+  var RICK_ID = (rickArg && rickArg !== '0' && /^[\w-]{11}$/.test(rickArg)) ? rickArg : 'QDia3e12czc';
+  var rickOn = rickArg !== '0';
+  var rickBox = $('rick'), rickVideo = null, rickPlayer = null, rickLive = false, ytDone = false;
+
+  function showPlayBtn(fn){
+    var b = $('rickPlay');
+    b.hidden = false;
+    b.onclick = function(){ b.hidden = true; try { fn(); } catch(e){} };
+  }
+
+  function rickroll(){
+    if (!rickOn || rickLive) return;
+    rickLive = true; ytDone = false;
+    rickBox.hidden = false;
+    requestAnimationFrame(function(){ rickBox.classList.add('show'); });
+
+    /* если рядом со страницей лежит rick.mp4 — играем его, иначе идём на YouTube */
+    var v = document.createElement('video');
+    var settled = false;
+    v.src = 'rick.mp4';
+    v.playsInline = true;
+    v.controls = true;
+    v.loop = true;
+    v.volume = 1;
+    v.addEventListener('canplay', function(){
+      if (settled) return;
+      settled = true;
+      rickVideo = v;
+      rickBox.insertBefore(v, rickBox.firstChild);
+      var p = v.play();
+      if (p && p['catch']) p['catch'](function(){
+        showPlayBtn(function(){ v.muted = false; v.volume = 1; v.play(); });
+      });
+    });
+    v.addEventListener('error', function(){
+      if (settled) return;
+      settled = true;
+      youtube();
+    });
+    v.load();
+    window.setTimeout(function(){ if (!settled){ settled = true; youtube(); } }, 2500);
+  }
+
+  function plainFrame(){
+    if (ytDone) return;
+    ytDone = true;
+    var f = document.createElement('iframe');
+    f.allow = 'autoplay; encrypted-media; fullscreen';
+    f.setAttribute('allowfullscreen', '');
+    f.src = 'https://www.youtube-nocookie.com/embed/' + RICK_ID +
+            '?autoplay=1&playsinline=1&rel=0&modestbranding=1&loop=1&playlist=' + RICK_ID;
+    rickBox.insertBefore(f, rickBox.firstChild);
+    showPlayBtn(function(){ f.src = f.src; });
+  }
+
+  function youtube(){
+    var holder = document.createElement('div');
+    holder.id = 'ytHolder';
+    rickBox.insertBefore(holder, rickBox.firstChild);
+
+    function boot(){
+      if (ytDone) return;
+      ytDone = true;
+      rickPlayer = new YT.Player('ytHolder', {
+        videoId: RICK_ID,
+        playerVars: { autoplay:1, playsinline:1, rel:0, modestbranding:1, loop:1, playlist:RICK_ID },
+        events: {
+          onReady: function(e){ e.target.unMute(); e.target.setVolume(100); e.target.playVideo(); },
+          onStateChange: function(e){
+            if (e.data === 1 && !e.target.isMuted()) $('rickPlay').hidden = true;
+          }
+        }
+      });
+      /* автозвук могли не дать — тогда просим один клик */
+      window.setTimeout(function(){
+        try {
+          if (rickPlayer.getPlayerState() !== 1 || rickPlayer.isMuted() || rickPlayer.getVolume() === 0){
+            showPlayBtn(function(){
+              rickPlayer.unMute(); rickPlayer.setVolume(100); rickPlayer.playVideo();
+            });
+          }
+        } catch(e){}
+      }, 2200);
+    }
+
+    if (window.YT && window.YT.Player){ boot(); return; }
+    window.onYouTubeIframeAPIReady = boot;
+    var s = document.createElement('script');
+    s.src = 'https://www.youtube.com/iframe_api';
+    s.onerror = plainFrame;
+    document.head.appendChild(s);
+    window.setTimeout(function(){ if (!ytDone) plainFrame(); }, 4000);
+  }
+
+  function closeRick(){
+    if (!rickLive) return;
+    rickBox.classList.remove('show');
+    $('rickPlay').hidden = true;
+    window.setTimeout(function(){
+      rickBox.hidden = true;
+      if (rickVideo){ rickVideo.pause(); rickVideo.remove(); rickVideo = null; }
+      if (rickPlayer && rickPlayer.destroy){ try { rickPlayer.destroy(); } catch(e){} }
+      rickPlayer = null;
+      var f = rickBox.querySelector('iframe'); if (f) f.remove();
+      var h = rickBox.querySelector('#ytHolder'); if (h) h.remove();
+      rickLive = false;
+    }, 450);
+  }
+
+  $('rickClose').addEventListener('click', closeRick);
+  window.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeRick(); });
+
   function finish(){
     if (done) return;
     done = true;
     var name = who.textContent.trim();
     $('wishTitle').textContent = (name ? name + ', желание' : 'Желание') + ' загадано! 🎉';
     burstConfetti();
-    melody();
+    if (!rickOn) melody();          /* мелодия не спорит со звуком клипа */
+    rickroll();
     say('<b>Все свечи потухли!</b> Загаданное обязательно сбудется.');
     /* сначала дым и конфетти, карточка с пожеланием — через секунду */
     window.setTimeout(function(){
@@ -593,6 +734,7 @@
   }
 
   function relight(){
+    closeRick();
     done = false;
     power = 0;
     document.body.classList.remove('done');

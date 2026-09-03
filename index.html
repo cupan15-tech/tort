@@ -604,9 +604,10 @@
   /* по умолчанию — короткая заливка без рекламы, крутится по кругу.
      ?rick=dQw4w9WgXcQ — официальный клип целиком, ?rick=0 — выключить рикролл */
   var rickArg = qs.get('rick');
-  var RICK_ID = (rickArg && rickArg !== '0' && /^[\w-]{11}$/.test(rickArg)) ? rickArg : 'QDia3e12czc';
+  var RICK_ID = (rickArg && rickArg !== '0' && /^[\w-]{11}$/.test(rickArg)) ? rickArg : 'OWR3zMaRKis';
+  var RICK_FALLBACK = 'dQw4w9WgXcQ';   /* если перезаливку снесут — уходим на официальный клип */
   var rickOn = rickArg !== '0';
-  var rickBox = $('rick'), rickVideo = null, rickPlayer = null, rickLive = false, ytDone = false;
+  var rickBox = $('rick'), rickVideo = null, rickPlayer = null, rickLive = false, ytDone = false, rickFellBack = false;
 
   function showPlayBtn(fn){
     var b = $('rickPlay');
@@ -674,6 +675,15 @@
           onReady: function(e){ e.target.unMute(); e.target.setVolume(100); e.target.playVideo(); },
           onStateChange: function(e){
             if (e.data === 1 && !e.target.isMuted()) $('rickPlay').hidden = true;
+          },
+          onError: function(e){
+            /* ролик недоступен (снесли, закрыли встраивание) — берём официальный */
+            if (rickFellBack || RICK_ID === RICK_FALLBACK) return;
+            rickFellBack = true;
+            try {
+              e.target.loadVideoById({ videoId: RICK_FALLBACK });
+              e.target.unMute(); e.target.setVolume(100);
+            } catch(err){}
           }
         }
       });

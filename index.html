@@ -207,20 +207,6 @@
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);pointer-events:none;
   }
 
-  .wish{
-    position:fixed;inset:0;z-index:60;display:grid;place-items:center;pointer-events:none;
-    opacity:0;transition:opacity .7s ease;
-  }
-  .wish div{
-    text-align:center;padding:26px 30px;border-radius:24px;max-width:min(420px,86vw);
-    background:rgba(30,14,40,.55);backdrop-filter:blur(8px);
-    box-shadow:0 20px 60px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.12);
-    transform:translateY(14px) scale(.96);transition:transform .7s cubic-bezier(.2,.9,.2,1);
-  }
-  .wish h2{margin:0 0 6px;font-size:clamp(22px,5.4vw,32px)}
-  .wish p{margin:0;color:var(--muted);font-size:14px}
-  body.done .wish{opacity:1}
-  body.done .wish div{transform:none}
   #confetti{position:fixed;inset:0;z-index:55;pointer-events:none}
 
   /* ---------- рикролл ---------- */
@@ -236,12 +222,6 @@
     position:absolute;top:14px;right:14px;z-index:2;width:42px;height:42px;border:0;border-radius:50%;
     font-size:20px;line-height:1;color:#fff;background:rgba(0,0,0,.55);cursor:pointer;
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);
-  }
-  #rickPlay{
-    position:absolute;z-index:3;left:50%;top:50%;transform:translate(-50%,-50%);
-    padding:18px 28px;border:0;border-radius:999px;cursor:pointer;
-    font:inherit;font-size:18px;font-weight:700;color:#2a1122;
-    background:linear-gradient(#ffd08a,#ffab3d);box-shadow:0 10px 30px rgba(0,0,0,.5);
   }
 </style>
 </head>
@@ -281,13 +261,7 @@
 
 <div id="rick" hidden>
   <button id="rickClose" title="Закрыть" aria-label="Закрыть">✕</button>
-  <button id="rickPlay" hidden>▶ Включить звук</button>
 </div>
-
-<div class="wish"><div>
-  <h2 id="wishTitle">Желание загадано! 🎉</h2>
-  <p>Пусть всё сбудется. И пусть тортик будет вкусным.</p>
-</div></div>
 
 <script>
 (function(){
@@ -606,15 +580,21 @@
   /* по умолчанию — короткая заливка без рекламы, крутится по кругу.
      ?rick=dQw4w9WgXcQ — официальный клип целиком, ?rick=0 — выключить рикролл */
   var rickArg = qs.get('rick');
-  var RICK_ID = (rickArg && rickArg !== '0' && /^[\w-]{11}$/.test(rickArg)) ? rickArg : 'OWR3zMaRKis';
+  var RICK_ID = (rickArg && rickArg !== '0' && /^[\w-]{11}$/.test(rickArg)) ? rickArg : 'QDia3e12czc';
   var RICK_FALLBACK = 'dQw4w9WgXcQ';   /* если перезаливку снесут — уходим на официальный клип */
   var rickOn = rickArg !== '0';
   var rickBox = $('rick'), rickVideo = null, rickPlayer = null, rickLive = false, ytDone = false, rickFellBack = false;
 
-  function showPlayBtn(fn){
-    var b = $('rickPlay');
-    b.hidden = false;
-    b.onclick = function(){ b.hidden = true; try { fn(); } catch(e){} };
+  /* звук не выпрашиваем: если автозвук не дали — играем без него
+     и молча включаем на первом же касании страницы */
+  function armUnmute(fn){
+    function go(){
+      window.removeEventListener('pointerdown', go, true);
+      window.removeEventListener('keydown', go, true);
+      try { fn(); } catch(e){}
+    }
+    window.addEventListener('pointerdown', go, true);
+    window.addEventListener('keydown', go, true);
   }
 
   function rickroll(){
@@ -638,7 +618,9 @@
       rickBox.insertBefore(v, rickBox.firstChild);
       var p = v.play();
       if (p && p['catch']) p['catch'](function(){
-        showPlayBtn(function(){ v.muted = false; v.volume = 1; v.play(); });
+        v.muted = true;
+        v.play();
+        armUnmute(function(){ v.muted = false; v.volume = 1; v.play(); });
       });
     });
     v.addEventListener('error', function(){
@@ -659,7 +641,6 @@
     f.src = 'https://www.youtube-nocookie.com/embed/' + RICK_ID +
             '?autoplay=1&playsinline=1&rel=0&modestbranding=1&loop=1&playlist=' + RICK_ID;
     rickBox.insertBefore(f, rickBox.firstChild);
-    showPlayBtn(function(){ f.src = f.src; });
   }
 
   function youtube(){
@@ -675,9 +656,6 @@
         playerVars: { autoplay:1, playsinline:1, rel:0, modestbranding:1, loop:1, playlist:RICK_ID },
         events: {
           onReady: function(e){ e.target.unMute(); e.target.setVolume(100); e.target.playVideo(); },
-          onStateChange: function(e){
-            if (e.data === 1 && !e.target.isMuted()) $('rickPlay').hidden = true;
-          },
           onError: function(e){
             /* ролик недоступен (снесли, закрыли встраивание) — берём официальный */
             if (rickFellBack || RICK_ID === RICK_FALLBACK) return;
@@ -693,7 +671,9 @@
       window.setTimeout(function(){
         try {
           if (rickPlayer.getPlayerState() !== 1 || rickPlayer.isMuted() || rickPlayer.getVolume() === 0){
-            showPlayBtn(function(){
+            rickPlayer.mute();
+            rickPlayer.playVideo();
+            armUnmute(function(){
               rickPlayer.unMute(); rickPlayer.setVolume(100); rickPlayer.playVideo();
             });
           }
@@ -713,7 +693,6 @@
   function closeRick(){
     if (!rickLive) return;
     rickBox.classList.remove('show');
-    $('rickPlay').hidden = true;
     window.setTimeout(function(){
       rickBox.hidden = true;
       if (rickVideo){ rickVideo.pause(); rickVideo.remove(); rickVideo = null; }
@@ -731,25 +710,17 @@
   function finish(){
     if (done) return;
     done = true;
-    var name = who.textContent.trim();
-    $('wishTitle').textContent = (name ? name + ', желание' : 'Желание') + ' загадано! 🎉';
     burstConfetti();
     if (!rickOn) melody();          /* мелодия не спорит со звуком клипа */
-    rickroll();
+    rickroll();                     /* без пауз и экранов — сразу клип */
+    $('relight').hidden = false;
     say('<b>Все свечи потухли!</b> Загаданное обязательно сбудется.');
-    /* сначала дым и конфетти, карточка с пожеланием — через секунду */
-    window.setTimeout(function(){
-      if (!done) return;
-      document.body.classList.add('done');
-      $('relight').hidden = false;
-    }, 1200);
   }
 
   function relight(){
     closeRick();
     done = false;
     power = 0;
-    document.body.classList.remove('done');
     document.documentElement.style.setProperty('--lit', '1');
     confettiPieces.length = 0;
     for (var i=0;i<candles.length;i++){

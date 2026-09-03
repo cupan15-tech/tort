@@ -181,12 +181,21 @@
     opacity:0;transition:opacity .3s ease;
   }
   .meter.on{opacity:1}
+  /* полоска: холодная — просто звук, тёплая — распознан именно выдох */
   .meter i{
     position:absolute;inset:0 auto 0 0;width:0%;border-radius:999px;
-    background:linear-gradient(90deg,#6ee7d0,#ffd166 55%,#ff5f6d);
-    transition:width .06s linear;
+    background:linear-gradient(90deg,#4d9fd6,#7ec8e8);
+    transition:width .06s linear, background .2s ease;
   }
+  .meter.blow i{background:linear-gradient(90deg,#ffd166,#ff7a3d 70%,#ff5f6d)}
   .meter u{position:absolute;top:-3px;bottom:-3px;left:32%;width:2px;background:rgba(255,255,255,.5);border-radius:2px}
+
+  select#micSelect{
+    max-width:min(320px,86vw);font:inherit;font-size:13px;padding:8px 12px;border-radius:999px;
+    color:var(--ink);background:rgba(255,255,255,.07);border:0;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);outline:none;cursor:pointer;
+  }
+  select#micSelect option{background:#241333;color:var(--ink)}
   .hint{margin:0;font-size:12.5px;color:rgba(192,174,198,.75)}
   .hint code,.status code{font-family:ui-monospace,Consolas,monospace;background:rgba(255,255,255,.08);padding:1px 5px;border-radius:5px}
 
@@ -223,7 +232,7 @@
 <div class="stage">
   <header class="top">
     <p class="eyebrow">Загадывай желание</p>
-    <h1>С днём рождения,<br><span id="who" contenteditable="true" spellcheck="false">друг</span>!</h1>
+    <h1>С днём рождения,<br><span id="who" contenteditable="true" spellcheck="false">Иван</span>!</h1>
   </header>
 
   <div class="cake-wrap">
@@ -239,12 +248,13 @@
   <div class="panel">
     <p class="status" id="status">Нажми кнопку и разреши доступ к микрофону — а потом дуй на свечи как следует.</p>
     <div class="meter" id="meter"><i id="fill"></i><u></u></div>
+    <select id="micSelect" hidden aria-label="Выбор микрофона"></select>
     <div class="row">
       <button class="btn" id="mic">🎤 Включить микрофон</button>
       <button class="btn ghost" id="manual">Дунуть вручную (пробел)</button>
       <button class="btn ghost" id="relight" hidden>Зажечь снова</button>
     </div>
-    <p class="hint">Имя можно исправить прямо в тексте, а ещё передать ссылкой: <code>?name=Аня&amp;candles=7</code></p>
+    <p class="hint" id="hint" hidden>Полоска показывает, что слышит микрофон. Она станет оранжевой, когда узнает именно выдох.</p>
   </div>
 </div>
 
@@ -394,6 +404,7 @@
     for (i=0;i<td.length;i++){ sum += td[i]*td[i]; }
     var rms = Math.sqrt(sum/td.length);
     dbg.rms = rms;
+    rawLevel = clamp(rms/0.35, 0, 1);   /* сырая громкость — для полоски */
 
     /* первые ~0.7 с слушаем фон, чтобы подстроить порог под комнату и микрофон */
     if (!calibrated){
@@ -438,6 +449,69 @@
     }
   }
 
+  /* ---------- запуск и переключение микрофона ---------- */
+  var srcNode = null, rawLevel = 0, rawSmooth = 0, silentFor = 0, silentWarned = false;
+
+  var MIC_CONSTRAINTS = { echoCancellation:false, noiseSuppression:false, autoGainControl:false };
+
+  function startGraph(stream){
+    if (micStream && micStream !== stream){
+      micStream.getTracks().forEach(function(t){ t.stop(); });
+    }
+    micStream = stream;
+
+    if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+    if (ac.state === 'suspended') ac.resume();
+    if (srcNode) srcNode.disconnect();
+
+    analyser = ac.createAnalyser();
+    analyser.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0.45;
+    srcNode = ac.createMediaStreamSource(stream);
+    srcNode.connect(analyser);
+
+    td = new Float32Array(analyser.fftSize);
+    fd = new Uint8Array(analyser.frequencyBinCount);
+
+    /* заново калибруемся под новое устройство */
+    calibrated = false; calibFrames = 0; calibSum = 0;
+    silentFor = 0; silentWarned = false;
+
+    var track = stream.getAudioTracks()[0];
+    dbg.dev = (track && track.label) || 'без названия';
+    dbg.err = 'нет';
+
+    $('meter').classList.add('on');
+    $('hint').hidden = false;
+    say('Слушаю тишину, чтобы подстроиться… секунду.');
+    listMics(track);
+  }
+
+  /* список входов — чтобы можно было переключиться, если браузер выбрал не то */
+  function listMics(activeTrack, force){
+    if (!navigator.mediaDevices.enumerateDevices) return;
+    navigator.mediaDevices.enumerateDevices().then(function(devs){
+      var ins = devs.filter(function(d){ return d.kind === 'audioinput' && d.deviceId; });
+      if (!ins.length || (ins.length < 2 && !force)) return;
+      var sel = $('micSelect'), active = activeTrack && activeTrack.getSettings ? activeTrack.getSettings().deviceId : null;
+      sel.innerHTML = '';
+      ins.forEach(function(d, i){
+        var o = document.createElement('option');
+        o.value = d.deviceId;
+        o.textContent = d.label || ('Микрофон ' + (i+1));
+        if (d.deviceId === active) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.hidden = false;
+    })['catch'](function(){});
+  }
+
+  $('micSelect').addEventListener('change', function(){
+    var id = this.value;
+    var c = { echoCancellation:false, noiseSuppression:false, autoGainControl:false, deviceId:{ exact:id } };
+    navigator.mediaDevices.getUserMedia({ audio:c }).then(startGraph)['catch'](micError);
+  });
+
   function plural(n,a,b,c){
     var n10 = n%10, n100 = n%100;
     if (n10 === 1 && n100 !== 11) return a;
@@ -445,7 +519,12 @@
     return c;
   }
 
-  function say(html){ $('status').innerHTML = html; }
+  var lastMsg = '';
+  function say(html){
+    if (html === lastMsg) return;
+    lastMsg = html;
+    $('status').innerHTML = html;
+  }
 
   function blowOut(c){
     c.out = true;
@@ -512,7 +591,21 @@
     var s = Math.max(lvl, manualLevel);
     smoothed = smoothed*0.55 + s*0.45;
 
-    $('fill').style.width = (smoothed*100).toFixed(0) + '%';
+    /* полоска показывает всё, что слышно, иначе «мёртвая полоска» ни о чём не говорит */
+    rawSmooth = rawSmooth*0.6 + Math.max(analyser ? rawLevel : 0, manualLevel)*0.4;
+    $('fill').style.width = (rawSmooth*100).toFixed(0) + '%';
+    $('meter').classList.toggle('blow', smoothed > 0.32);
+
+    /* микрофон отдан, но в него идёт тишина — почти всегда выбран не тот вход */
+    if (analyser && calibrated && !done){
+      silentFor = dbg.rms < 0.002 ? silentFor + dt : 0;
+      if (silentFor > 3 && !silentWarned){
+        silentWarned = true;
+        say('Микрофон включён, но сигнала нет совсем. Проверь, что выбран правильный вход ' +
+            '(список ниже) и что он не отключён в Windows: Параметры → Система → Звук → Ввод.');
+        listMics(micStream && micStream.getAudioTracks()[0], true);
+      }
+    }
 
     if (!done){
       wind(smoothed);
@@ -524,8 +617,12 @@
       for (var i=0;i<candles.length;i++){
         if (!candles[i].out && power >= gates[i]) blowOut(candles[i]);
       }
-      if (calibrated && power < 0.1 && smoothed > 0.12 && smoothed < 0.32){
-        say('Слышу, но слабовато — <b>дуй сильнее</b> и ближе к микрофону.');
+      if (calibrated && power < 0.1){
+        if (rawSmooth > 0.28 && smoothed < 0.2){
+          say('Звук слышу, но на выдох не похоже — <b>дуй прямо в микрофон</b>, а не говори в него.');
+        } else if (smoothed > 0.12 && smoothed < 0.32){
+          say('Слышу, но слабовато — <b>дуй сильнее</b> и ближе к микрофону.');
+        }
       }
     } else {
       wind(0);
@@ -566,24 +663,9 @@
     }
     btn.disabled = true;
     say('Разреши доступ к микрофону в подсказке браузера…');
-    navigator.mediaDevices.getUserMedia({
-      audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false }
-    }).then(function(stream){
-      micStream = stream;
-      ac = new (window.AudioContext || window.webkitAudioContext)();
-      if (ac.state === 'suspended') ac.resume();
-      analyser = ac.createAnalyser();
-      analyser.fftSize = 1024;
-      analyser.smoothingTimeConstant = 0.45;
-      ac.createMediaStreamSource(stream).connect(analyser);
-      td = new Float32Array(analyser.fftSize);
-      fd = new Uint8Array(analyser.frequencyBinCount);
-      var track = stream.getAudioTracks()[0];
-      dbg.dev = (track && track.label) || 'без названия';
-      dbg.err = 'нет';
-      $('meter').classList.add('on');
+    navigator.mediaDevices.getUserMedia({ audio: MIC_CONSTRAINTS }).then(function(stream){
       btn.textContent = '🎤 Микрофон включён';
-      say('Слушаю тишину, чтобы подстроиться… секунду.');
+      startGraph(stream);
     })['catch'](function(err){
       btn.disabled = false;
       micError(err);
@@ -591,6 +673,11 @@
   });
 
   /* ---------- запасной вариант без микрофона ---------- */
+  /* на телефоне «пробел» не поможет — подпись под устройство */
+  if (window.matchMedia && window.matchMedia('(hover: none)').matches){
+    $('manual').textContent = 'Задуть вручную (удерживай)';
+  }
+
   function hold(on){ return function(e){ e.preventDefault(); manualHeld = on; }; }
   $('manual').addEventListener('pointerdown', hold(true));
   $('manual').addEventListener('pointercancel', hold(false));
